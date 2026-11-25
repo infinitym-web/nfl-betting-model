@@ -206,24 +206,8 @@ def build_features(games, team_games, qb_games, weather, elo_pred):
     g["neutral"] = (g.location == "Neutral").astype(float)
     g["hfa_est"] = g.game_id.map(_rolling_hfa(g)) * (1 - g.neutral)
 
-    # Environment. Unknown future retractable-roof status counts as indoor.
-    roof = g.roof.fillna("closed")
-    g["is_indoor"] = roof.isin(INDOOR).astype(float)
-    g["is_open_roof"] = (roof == "open").astype(float)
-    outdoor = 1 - g.is_indoor
-    g["temp"] = g.w_temp.fillna(g.temp).fillna(65).where(outdoor == 1, 70)
-    g["wind"] = g.w_wind.fillna(g.wind).fillna(8).where(outdoor == 1, 0)
-    g["precip"] = g.w_precip.fillna(0).where(outdoor == 1, 0).clip(0, 1)
-    g["snow"] = g.w_snow.fillna(0).where(outdoor == 1, 0).clip(0, 3)
-    g["cold"] = ((45 - g.temp).clip(lower=0) / 10) * outdoor
-    g["hot"] = ((g.temp - 85).clip(lower=0) / 10) * outdoor
-    g["windy"] = ((g.wind - 10).clip(lower=0) / 5) * outdoor
-    g["wet"] = (g.precip > 0.05).astype(float) * outdoor
-    # Interactions: bad weather tends to shrink margins (favourites cover less),
-    # and dome/warm-weather teams may struggle in the cold.
-    g["wind_x_line"] = g.windy * g.spread_line.fillna(0) / 7
-    g["wet_x_line"] = g.wet * g.spread_line.fillna(0) / 7
-    g["cold_x_softteam"] = g.cold * np.array(cold_team_diff_base)
+    g["soft_diff"] = cold_team_diff_base
+    g = environment_features(g)
     g["div_game_x_line"] = g.div_game * g.spread_line.fillna(0) / 7
 
     g = g.merge(_scoring_and_pace(g, team_games), on="game_id", how="left")
@@ -239,8 +223,35 @@ def build_features(games, team_games, qb_games, weather, elo_pred):
     g["short_week_any"] = ((g.home_rest <= 5) | (g.away_rest <= 5)).astype(float)
     g["playoff"] = (g.game_type != "REG").astype(float)
     g["late_season"] = ((g.game_type == "REG") & (g.week >= 15)).astype(float)
-    g["gusty"] = ((g.w_gust.fillna(g.wind * 1.4) - 20).clip(lower=0) / 10) * outdoor
     g["wind_x_total"] = g.windy * g.total_line.fillna(44) / 44
+    return g
+
+
+def environment_features(g):
+    """Roof and weather features from the w_* weather columns. Kept separate so
+    a backtest can swap in FORECAST weather and recompute just these."""
+    g = g.copy()
+    # Unknown future retractable-roof status counts as indoor.
+    roof = g.roof.fillna("closed")
+    g["is_indoor"] = roof.isin(INDOOR).astype(float)
+    g["is_open_roof"] = (roof == "open").astype(float)
+    outdoor = 1 - g.is_indoor
+    g["temp"] = g.w_temp.fillna(g.temp).fillna(65).where(outdoor == 1, 70)
+    g["wind"] = g.w_wind.fillna(g.wind).fillna(8).where(outdoor == 1, 0)
+    g["precip"] = g.w_precip.fillna(0).where(outdoor == 1, 0).clip(0, 1)
+    g["snow"] = g.w_snow.fillna(0).where(outdoor == 1, 0).clip(0, 3)
+    g["cold"] = ((45 - g.temp).clip(lower=0) / 10) * outdoor
+    g["hot"] = ((g.temp - 85).clip(lower=0) / 10) * outdoor
+    g["windy"] = ((g.wind - 10).clip(lower=0) / 5) * outdoor
+    g["wet"] = (g.precip > 0.05).astype(float) * outdoor
+    g["gusty"] = ((g.w_gust.fillna(g.wind * 1.4) - 20).clip(lower=0) / 10) * outdoor
+    # Interactions: bad weather tends to shrink margins (favourites cover less),
+    # and dome/warm-weather teams may struggle in the cold.
+    g["wind_x_line"] = g.windy * g.spread_line.fillna(0) / 7
+    g["wet_x_line"] = g.wet * g.spread_line.fillna(0) / 7
+    g["cold_x_softteam"] = g.cold * g.soft_diff
+    if "total_line" in g:
+        g["wind_x_total"] = g.windy * g.total_line.fillna(44) / 44
     return g
 
 
