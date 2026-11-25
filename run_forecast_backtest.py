@@ -19,6 +19,8 @@ The model itself is still trained on recorded weather from earlier seasons -
 that's realistic: you learn how weather matters from history, then bet on
 the forecast.
 """
+import argparse
+
 import numpy as np
 import pandas as pd
 
@@ -37,7 +39,7 @@ EDGE = 0.03
 def run(feats, fd, fc, snap, use_forecast):
     played = feats[feats.result.notna()].set_index("game_id")
     snap_fd = fd[fd.snapshot == snap].set_index("game_id")
-    lead_fc = fc[fc.lead_days == LEAD[snap]].set_index("game_id")
+    lead_fc = fc[fc.snapshot == snap].set_index("game_id")
     ok = feats.total.notna() & feats.total_line.notna()
     bets = []
     for season in SEASONS:
@@ -80,9 +82,22 @@ def describe(sim, pin_close):
                 bad_bets=len(bw), bad_roi=bw.profit.sum() / bw.stake.sum() if len(bw) else np.nan)
 
 
+def load_forecasts(source):
+    """One forecast per game per bet time, columns game_id, snapshot, w_*."""
+    if source == "mos":  # NOAA airport forecasts (free, Iowa State Mesonet)
+        return pd.read_csv("data/weather_forecast_mos.csv")
+    fc = pd.read_csv("data/weather_forecast.csv")  # Open-Meteo previous runs
+    parts = [fc[fc.lead_days == d].assign(snapshot=s) for s, d in LEAD.items()]
+    return pd.concat(parts, ignore_index=True)
+
+
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--source", choices=["mos", "open-meteo"], default="mos",
+                    help="mos = NOAA airport forecasts (default); open-meteo = Previous Runs archive")
+    args = ap.parse_args()
     feats, _, _ = load_all()
-    fc = pd.read_csv("data/weather_forecast.csv")
+    fc = load_forecasts(args.source)
     odds = load_odds(feats)
     fd, pin = odds["fanduel"], odds["pinnacle"]
     pin_close = pin[pin.snapshot == "close"].set_index("game_id")
@@ -91,11 +106,11 @@ def main():
     # How good were the forecasts? (bad-weather calls vs what happened)
     rec = feats.set_index("game_id")
     print("FORECAST ACCURACY vs recorded weather (outdoor games)")
-    for d in (6, 3, 1):
-        f = fc[fc.lead_days == d].set_index("game_id").join(rec[["w_temp", "w_wind", "w_precip"]], rsuffix="_rec").dropna()
+    for snap in ("open", "mid", "late", "close"):
+        f = fc[fc.snapshot == snap].set_index("game_id").join(rec[["w_temp", "w_wind", "w_precip"]], rsuffix="_rec").dropna()
         rain_f, rain_r = f.w_precip > 0.05, f.w_precip_rec > 0.05
         wind_f, wind_r = f.w_wind > 10, f.w_wind_rec > 10
-        print(f"  {d} day(s) ahead: temp off by {np.abs(f.w_temp - f.w_temp_rec).mean():.1f}F, "
+        print(f"  {NAMES[snap]:8s} bet ({len(f)} games): temp off by {np.abs(f.w_temp - f.w_temp_rec).mean():.1f}F, "
               f"wind off by {np.abs(f.w_wind - f.w_wind_rec).mean():.1f} mph, "
               f"rain called right {((rain_f == rain_r).mean()):.0%} "
               f"(caught {rain_f[rain_r].mean():.0%} of rainy games), "
