@@ -4,3 +4,4 @@ data/raw_pbp/
 output/
 __pycache__/
 *.pyc
+data/raw_weather/

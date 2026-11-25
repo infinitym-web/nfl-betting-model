@@ -69,9 +69,81 @@ WEATHER_URL = ("https://archive-api.open-meteo.com/v1/archive?latitude={lat}&lon
                "&timezone=America%2FNew_York")
 
 
+METEOSTAT_STATIONS = "https://bulk.meteostat.net/v2/stations/lite.json.gz"
+METEOSTAT_HOURLY = "https://bulk.meteostat.net/v2/hourly/{}.csv.gz"
+MS_COLS = "date hour temp dwpt rhum prcp snow wdir wspd wpgt pres tsun coco".split()
+
+
+def build_weather_meteostat(games):
+    """
+    FAST PATH: recorded weather from Meteostat's bulk archive (official weather
+    station observations, mostly airports). One file per station holds every
+    hour of its history, so ~2-3 downloads per stadium cover all seasons.
+
+    For each stadium we use up to 3 nearby stations (within 40 km) and, for
+    each game, the closest one that has readings for the kickoff window.
+    Units are converted to match the rest of the project (F, mph, inches).
+    Snowfall isn't recorded, so precipitation at or below 33F counts as snow
+    (1 inch of melted precipitation ~ 10 inches of snow).
+    Gusts aren't recorded either; the model then estimates them from wind.
+    """
+    import gzip
+    from tool.features import _haversine_km
+
+    out = DATA / "weather.csv"
+    have = pd.read_csv(out) if out.exists() else pd.DataFrame(columns=["game_id"])
+    need = games[games.result.notna() & ~games.roof.isin(["dome", "closed"])
+                 & ~games.game_id.isin(have.game_id) & games.stadium_id.isin(COORDS)].copy()
+    if need.empty:
+        return
+    cache = DATA / "raw_weather"
+    cache.mkdir(exist_ok=True)
+    st_file = cache / "stations.json.gz"
+    if not st_file.exists():
+        download(METEOSTAT_STATIONS, st_file)
+    stations = [s for s in json.load(gzip.open(st_file))
+                if (s.get("inventory", {}).get("hourly") or {}).get("start")]
+
+    print(f"  weather (Meteostat): {len(need)} games at {need.stadium_id.nunique()} stadiums")
+    # Kickoff in UTC (nflverse times are US Eastern); station hours are UTC.
+    need["kick_utc"] = [pd.Timestamp(f"{d} {t}").tz_localize("America/New_York").tz_convert("UTC")
+                        .tz_localize(None).floor("h") for d, t in zip(need.gameday, need.gametime)]
+    rows = []
+    for stadium, grp in need.groupby("stadium_id"):
+        here = COORDS[stadium]
+        near = sorted(((_haversine_km(here, (s["location"]["latitude"], s["location"]["longitude"])), s["id"])
+                       for s in stations), key=lambda x: x[0])
+        near = [sid for dist, sid in near[:3] if dist <= 40]
+        frames = []
+        for sid in near:
+            f = cache / f"{sid}.csv.gz"
+            if not f.exists():
+                try:
+                    download(METEOSTAT_HOURLY.format(sid), f)
+                except Exception:
+                    continue
+            h = pd.read_csv(f, header=None, names=MS_COLS, usecols=["date", "hour", "temp", "prcp", "wspd"])
+            h["time"] = pd.to_datetime(h.date) + pd.to_timedelta(h.hour, unit="h")
+            frames.append(h.set_index("time")[["temp", "prcp", "wspd"]])
+        for g in grp.itertuples():
+            window = pd.date_range(g.kick_utc, periods=4, freq="h")
+            for h in frames:
+                w = h.reindex(window)
+                if w.temp.notna().sum() >= 2 and w.wspd.notna().sum() >= 2:
+                    temp_f = w.temp.mean() * 9 / 5 + 32
+                    precip_in = w.prcp.sum() / 25.4  # missing hours count as dry
+                    rows.append(dict(game_id=g.game_id, w_temp=temp_f, w_wind=w.wspd.mean() / 1.609,
+                                     w_gust=float("nan"), w_precip=precip_in,
+                                     w_snow=precip_in * 10 if temp_f <= 33 else 0.0))
+                    break
+    new = pd.DataFrame(rows)
+    new.to_csv(out, mode="a", header=not out.exists(), index=False)
+    print(f"  weather (Meteostat): saved {len(new)} games; the rest fall back to Open-Meteo")
+
+
 def build_weather(games):
     """
-    Actual recorded weather (ERA5 reanalysis via Open-Meteo) for the kickoff
+    Fallback: actual recorded weather (ERA5 reanalysis via Open-Meteo) for the kickoff
     window (kickoff hour + next 3 hours) of every game not played under a
     closed roof. Kickoff times in nflverse are US Eastern, so we request hours
     in Eastern time too. Cached: only games not already in weather.csv are fetched.
@@ -142,7 +214,8 @@ def main():
         print("Building play-by-play summaries")
         build_pbp(range(1999, current + 1), current)
     print("Building weather")
-    build_weather(games)
+    build_weather_meteostat(games)   # fast bulk archive first
+    build_weather(games)             # Open-Meteo for anything still missing
     print("Done.")
 
 

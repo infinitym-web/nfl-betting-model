@@ -18,7 +18,7 @@ python3 analyze_weather.py           # how weather relates to scoring and result
 python3 upcoming.py                  # this week's games: model vs market, with forecasts
 ```
 
-Weekly refresh: `python3 build_data.py`. The free weather service allows a limited number of requests per day. If it stops partway, run it again the next day and it picks up where it left off.
+Weekly refresh: `python3 build_data.py`. Historical weather comes mostly from Meteostat's bulk archive (a few minutes, no daily cap). Open-Meteo fills the remaining gaps, mainly the current season, and has a daily request limit. If it stops partway, run it again the next day and it picks up where it left off.
 
 ## Data
 
@@ -27,7 +27,7 @@ Weekly refresh: `python3 build_data.py`. The free weather service allows a limit
 | `games.csv` | schedule, scores, closing lines and prices, roof, starting QBs | nflverse |
 | `team_games.csv` | each team's plays, EPA, success rate per game | nflverse play-by-play |
 | `qb_games.csv` | each QB's dropbacks and EPA per game | nflverse play-by-play |
-| `weather.csv` | temperature, wind, gusts, rain, snow at kickoff (outdoor and open-roof games) | Open-Meteo historical weather |
+| `weather.csv` | temperature, wind, rain, snow at kickoff (outdoor and open-roof games) | Meteostat weather stations (93% of games); Open-Meteo for the rest |
 
 **EPA (Expected Points Added)** scores every play by how much it changed the offense's expected points. Averaged per play, it's one of the best public measures of team quality.
 
@@ -66,23 +66,23 @@ Elo, EPA, QB, rest, travel and weather add nothing beyond the closing spread; th
 | Betting market | 10.471 | | | | |
 | Points averages, raw | 10.721 | 3,511 | 49.9% | −2.6% | −6.4% to +1.0% |
 | Full model, no weather | 10.468 | 633 | 51.7% | −0.4% | −7.4% to +6.8% |
-| **Full model + weather** | **10.465** | **1,525** | **54.0%** | **+2.7%** | −2.5% to +7.8% |
+| **Full model + weather** | **10.453** | **1,528** | **54.8%** | **+4.8%** | −0.7% to +10.5% |
 
-* Adding weather turns break-even into a small profit. The strongest effect is **wind**: outdoors at 10+ mph, games went under about **58%** of the time since 2014.
-* It made money in only 8 of 16 seasons, and **2023–2025 were losing years**.
-* The luck range still includes zero, so this isn't proven yet.
+* Adding weather turns break-even into a profit. The strongest effects are **rain** (rain or snow outdoors: under 57.5%) and **wind** (10–15 mph: under 57%; over 20 mph: under 60%).
+* It made money in 11 of 16 seasons, with about the same ROI in 2010–17 (+4.6%) and 2018–25 (+4.9%). **2024 and 2025 were losing years.**
+* The luck range still just includes zero, so this isn't proven yet.
 
 ## Caveats
 
 1. **Recorded weather, not forecasts.** The backtest uses weather recorded at kickoff. A bettor only has the forecast, which can be wrong, especially for wind. This flatters the weather results; how much is unknown until the backtest runs on real historical forecasts.
 2. **Closing lines only.** These are the hardest lines to beat. Earlier-week lines are softer, but testing them needs paid historical odds.
 3. **Not FanDuel's exact prices.** The data is a market consensus.
-4. **Many variants tried.** The more versions and thresholds tested, the more likely one looks good by chance. Treat +2.7% as a lead, not a result.
-5. **Rain and snow** aren't yet in the backtest (they wait on the weather download) and are currently ignored.
+4. **Many variants tried.** The more versions and thresholds tested, the more likely one looks good by chance. Treat +4.8% as a lead, not a result.
+5. **Weather approximations.** Readings come from the nearest weather station, often an airport, not the stadium. Snowfall is estimated from precipitation at or below 33°F. Gusts aren't recorded, so they're estimated from wind speed.
 
 ## Planned next steps
 
-1. Finish the weather download (rain, snow, gusts) and rerun.
+1. Fill the last weather gaps (mainly 2026) by rerunning `build_data.py`.
 2. Backtest with historical weather **forecasts** instead of recorded weather.
 3. Get historical opening and mid-week lines (FanDuel via The Odds API) to test betting earlier in the week and track closing line value.
 4. Paper-trade the over/under model for the rest of 2026 before risking money.
