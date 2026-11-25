@@ -1,0 +1,6 @@
+# Large downloads that build_data.py recreates
+data/raw_pbp/
+# Generated outputs
+output/
+__pycache__/
+*.pyc
