@@ -9,6 +9,8 @@ Reports:
   * FanDuel's actual margin ("hold") on alternate totals, by distance from the main line
   * The strategy's results at those real prices, bad-weather games vs others
 """
+import argparse
+
 import numpy as np
 import pandas as pd
 
@@ -24,12 +26,22 @@ EDGE = 0.03
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--pregame", action="store_true",
+                    help="use alternate prices from 30 min before kickoff (with the closing main line)")
+    args = ap.parse_args()
     feats, _, _ = load_all()
-    alt = pd.read_csv("data/fanduel_alt_totals.csv")
-    fd = load_odds(feats)["fanduel"]
-    late = fd[fd.snapshot == "late"].set_index("game_id")
     played = feats[feats.total.notna()].set_index("game_id")
-    games = played.join(late[["point_over"]], how="inner").loc[lambda d: d.index.isin(alt.game_id)]
+    if args.pregame:
+        alt = pd.read_csv("data/fanduel_alt_totals_pregame.csv")
+        games = played.assign(point_over=played.total_line).loc[lambda d: d.index.isin(alt.game_id)]
+        when = "30 min before kickoff"
+    else:
+        alt = pd.read_csv("data/fanduel_alt_totals.csv")
+        fd = load_odds(feats)["fanduel"]
+        late = fd[fd.snapshot == "late"].set_index("game_id")
+        games = played.join(late[["point_over"]], how="inner").loc[lambda d: d.index.isin(alt.game_id)]
+        when = "Saturday lines"
     print(f"{len(games)} outdoor games with FanDuel alternate totals\n")
 
     # FanDuel hold on alternate totals
@@ -83,11 +95,17 @@ def main():
     sim = simulate_bankroll(bets, start=START)
     s = summarize(sim, start=START)
     lo, hi = s["roi_90pct_range"]
-    print(f"ALTERNATE-UNDER STRATEGY AT FANDUEL'S REAL PRICES (EV >= {EDGE:.0%}, Saturday lines)")
+    print(f"ALTERNATE-UNDER STRATEGY AT FANDUEL'S REAL PRICES (EV >= {EDGE:.0%}, {when})")
     print(f"  bets {s['bets']}, win {s['win_rate']:.1%}, median odds {bets.odds.median():+.0f}, "
           f"ROI {s['roi']:+.1%} [luck range {lo:+.1%} to {hi:+.1%}], ${START:,.0f} -> ${s['final_bankroll']:,.0f}")
     print(sim.groupby("env").apply(lambda d: pd.Series({
         "bets": len(d), "win%": f"{(d.outcome == 'win').mean():.1%}",
+        "ROI": f"{d.profit.sum() / d.stake.sum():+.1%}"})).to_string())
+    print("\nBy distance below the main total:")
+    sim["below"] = pd.cut(sim.main - sim.bet.str.split().str[1].astype(float), [3.9, 6.5, 10.5, 40],
+                          labels=["4-6 pts", "7-10 pts", "over 10 pts"])
+    print(sim.groupby("below", observed=True).apply(lambda d: pd.Series({
+        "bets": len(d), "win%": f"{(d.outcome == 'win').mean():.1%}", "median odds": f"{d.odds.median():+.0f}",
         "ROI": f"{d.profit.sum() / d.stake.sum():+.1%}"})).to_string())
     sim.to_csv("output/fanduel_alt_under_bets.csv", index=False)
 
