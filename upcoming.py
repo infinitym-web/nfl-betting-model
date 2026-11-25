@@ -22,6 +22,7 @@ from tool.features import STEP2_FEATURES, TOTALS_FEATURES
 from tool.model import fit_latest, add_model_columns, predict_dev
 from tool.odds import cover_probs, no_vig_probs, expected_value
 from tool.stadiums import COORDS
+from tool.alt_lines import alt_targets
 
 FORECAST_URL = ("https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
                 "&hourly=temperature_2m,precipitation,snowfall,wind_speed_10m,wind_gusts_10m"
@@ -103,6 +104,28 @@ def main():
         })
     pd.set_option("display.width", 200)
     print(pd.DataFrame(rows).to_string(index=False))
+
+    # Alternate over/unders: only in bad-weather games, the one place they
+    # held up in backtests (run_alt_backtest.py).
+    hist = feats[feats.total.notna() & feats.total_line.notna() & (feats.season >= 2002)]
+    alt_rows = []
+    for g in up[(up.is_indoor == 0) & ((up.wet > 0) | (up.windy > 0))].itertuples():
+        t = alt_targets(g.total_line, g.pred_total - g.total_line,
+                        hist.total_line.to_numpy(), hist.total.to_numpy())
+        t = t[(t.side == "under") & (t.offset <= -4)]
+        for r in t.sort_values("offset", ascending=False).head(3).itertuples():
+            alt_rows.append({"date": g.gameday, "game": f"{g.away_team} @ {g.home_team}",
+                             "main total": f"{g.total_line:g}",
+                             "alt bet": f"UNDER {r.alt_line:g}",
+                             "model chance": f"{r.model_prob:.0%}",
+                             "bet only if FanDuel offers at least": f"{r.min_odds:+.0f}",
+                             "typical book price": f"{r.typical_odds:+.0f}"})
+    print("\nALTERNATE UNDERS for bad-weather games (rain, or wind over 10 mph)")
+    if alt_rows:
+        print(pd.DataFrame(alt_rows).to_string(index=False))
+        print("Check FanDuel's alternate totals: only bet a line if its price is at least the minimum shown.")
+    else:
+        print("  none this week (no rain or strong wind forecast for outdoor games yet)")
     print("\nEV = expected profit per $1 at the listed price. Spread EVs have not held up in")
     print("backtests; over/under EVs of +1-3% were roughly break-even to slightly positive.")
 

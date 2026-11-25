@@ -15,7 +15,8 @@ python3 build_data.py                # download / refresh all data (first run: a
 python3 run_backtest.py              # spread models: backtest report
 python3 run_totals_backtest.py       # over/under models: backtest report
 python3 analyze_weather.py           # how weather relates to scoring and results
-python3 upcoming.py                  # this week's games: model vs market, with forecasts
+python3 run_alt_backtest.py          # alternate spreads / totals vs main lines
+python3 upcoming.py                  # this week's games: model vs market, forecasts, alt-under targets
 ```
 
 Weekly refresh: `python3 build_data.py`. Historical weather comes mostly from Meteostat's bulk archive (a few minutes, no daily cap). Open-Meteo fills the remaining gaps, mainly the current season, and has a daily request limit. If it stops partway, run it again the next day and it picks up where it left off.
@@ -71,6 +72,24 @@ Elo, EPA, QB, rest, travel and weather add nothing beyond the closing spread; th
 * Adding weather turns break-even into a profit. The strongest effects are **rain** (rain or snow outdoors: under 57.5%) and **wind** (10–15 mph: under 57%; over 20 mph: under 60%).
 * It made money in 11 of 16 seasons, with about the same ROI in 2010–17 (+4.6%) and 2018–25 (+4.9%). **2024 and 2025 were losing years.**
 * The luck range still just includes zero, so this isn't proven yet.
+
+**Alternate lines (`run_alt_backtest.py`): promising for over/unders in bad weather only.**
+
+There's no history of real alternate-line prices, so each alternate line from −10 to +10 points is priced the way a book would: from the historical distribution of results in games with a similar line (which handles key numbers such as 3, 7, 41 and 44), minus an assumed book margin. The model's lean then nudges that probability, and the single best line per game is bet.
+
+| Over/unders, 2010–2025 | Book margin | Bets | Win% | Typical odds | ROI |
+|---|---|---|---|---|---|
+| Main line only | 4.5% | 547 | 54.0% | −111 | +0.4% |
+| Alternate ladder | 4.5% | 1,552 | 29.6% | +295 | +7.3% |
+| Alternate ladder | 10% | 753 | 28.4% | +291 | +5.4% |
+| Alternate ladder | 20% | 263 | n/a | n/a | +5.1% |
+
+* The ladder mostly picked **unders 7–10 points below the main total**, at long odds.
+* All of the profit came from **bad-weather games**: rain or wind over 10 mph made +11.0% on 633 bets; normal weather lost 9.4% on 461 bets.
+* Spreads: alternate lines lose less than main lines but still lose (−0.1% to −3.1%).
+* **Expect big swings.** Win rate is about 28%, and the bankroll fell as much as 45% from a peak.
+* `upcoming.py` lists alternate unders for bad-weather games with the **minimum price** needed. Only bet if FanDuel offers at least that.
+* Real FanDuel alternate prices could be better or worse than this stand-in. Validating it needs historical alternate-line odds (paid, from The Odds API).
 
 ## Caveats
 
