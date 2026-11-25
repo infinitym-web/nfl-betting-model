@@ -2,6 +2,23 @@
 
 Finds NFL bets worth more than they cost (point spreads and over/unders), tested honestly on 2010–2025.
 
+## Weekly picks (paper trading)
+
+Run on Monday and Thursday mornings (Saturday optional):
+
+```
+python3 build_data.py        # refresh games, scores, play-by-play, weather
+python3 weekly_picks.py      # this week's picks + settle finished games
+```
+
+`weekly_picks.py` pulls FanDuel's and Pinnacle's current lines (2 Odds API credits) and the newest NOAA airport forecast, then picks **unders only** two ways:
+* **Model:** expected profit of 3% or more at FanDuel's price.
+* **Weather rule:** an outdoor game with wind over 15 mph or rain in the forecast.
+
+Each pick is logged once per game, system and bet day, with the price at that moment, in `data/picks_log.csv`. Later runs fill in the result, profit (in units, 1 unit = 1% of a $1,000 paper bankroll) and closing line value. Dashboard files are written to `output/dashboard/`; `export_backtest_summary.py` builds the backtest part.
+
+**Dashboard:** the "NFL Weather Unders" page on claude.ai shows this week's picks, every game's model view, the paper-trading record and the backtest. To refresh it, ask Claude to run the picks and update the dashboard; it re-uploads the files in `output/dashboard/`.
+
 ## Setup
 
 ```

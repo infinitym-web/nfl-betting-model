@@ -1,0 +1,8 @@
+logged_at,bet_day,season,week,game_id,game,kickoff,system,side,line,price,model_ev,units,environment,final_total,outcome,profit_units,close_line,clv_pts
+2026-11-25 23:43 UTC,Thursday,2026,12,2026_12_KC_BUF,KC @ BUF,Thu Nov 26 08:20 PM ET,model,under,46.5,-110,0.1426,3.0,"38°F, wind 17 mph, rain",,,,,
+2026-11-25 23:43 UTC,Thursday,2026,12,2026_12_KC_BUF,KC @ BUF,Thu Nov 26 08:20 PM ET,rule,under,46.5,-110,0.1426,1.0,"38°F, wind 17 mph, rain",,,,,
+2026-11-25 23:43 UTC,Thursday,2026,12,2026_12_NO_CIN,NO @ CIN,Sun Nov 29 01:00 PM ET,model,under,49.5,-110,0.1298,3.0,"47°F, wind 14 mph, rain",,,,,
+2026-11-25 23:43 UTC,Thursday,2026,12,2026_12_NO_CIN,NO @ CIN,Sun Nov 29 01:00 PM ET,rule,under,49.5,-110,0.1298,1.0,"47°F, wind 14 mph, rain",,,,,
+2026-11-25 23:43 UTC,Thursday,2026,12,2026_12_LV_CLE,LV @ CLE,Sun Nov 29 08:20 PM ET,model,under,40.5,-115,0.0945,2.72,"48°F, wind 13 mph, rain",,,,,
+2026-11-25 23:43 UTC,Thursday,2026,12,2026_12_LV_CLE,LV @ CLE,Sun Nov 29 08:20 PM ET,rule,under,40.5,-115,0.0945,1.0,"48°F, wind 13 mph, rain",,,,,
+2026-11-25 23:43 UTC,Thursday,2026,12,2026_12_CAR_TB,CAR @ TB,Mon Nov 30 08:15 PM ET,model,under,43.5,-105,0.042,1.1,"70°F, wind 14 mph",,,,,
