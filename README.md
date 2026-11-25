@@ -16,6 +16,8 @@ python3 run_backtest.py              # spread models: backtest report
 python3 run_totals_backtest.py       # over/under models: backtest report
 python3 analyze_weather.py           # how weather relates to scoring and results
 python3 run_alt_backtest.py          # alternate spreads / totals vs main lines
+python3 fetch_mos.py                 # free historical NOAA airport forecasts (Iowa State Mesonet)
+python3 run_forecast_backtest.py     # FanDuel over/unders with forecast vs recorded weather
 python3 upcoming.py                  # this week's games: model vs market, forecasts, alt-under targets
 ```
 
@@ -112,9 +114,30 @@ There's no history of real alternate-line prices, so each alternate line from �
 * That's far weaker than the stand-in backtest (+11% in bad weather). The model mostly picked lines more than 10 points below the total, where its probability estimates are least reliable. **Alternate lines are not proven; main-line unders in bad weather remain the best-supported bet.**
 * FanDuel's historical alternate lines are mostly missing from Saturday snapshots but present 30 minutes before kickoff.
 
+## The key test: real FanDuel prices with real weather forecasts
+
+`fetch_mos.py` downloads NOAA's official airport forecasts (MOS), archived free by Iowa State's Mesonet. For each bet time it uses the newest forecast published at least 4 hours before the bet: about 162 hours ahead for Monday bets, 86 for Thursday, 36 for Saturday and 8 for Sunday. `run_forecast_backtest.py` reruns the FanDuel over/under backtest on the same games with recorded weather and with the forecast.
+
+**Forecast accuracy (outdoor games, 2020–2026):** temperature is off by about 7°F six days out and 2–3°F a day out. Rain forecasts catch about half of rainy games from Thursday on (almost none on Monday). Wind over 10 mph is caught about 80% of the time.
+
+| Over/under, bet placed | Weather | Bets | Win% | ROI | Luck range (90%) | Winning seasons |
+|---|---|---|---|---|---|---|
+| Monday | recorded | 215 | 61.3% | +17.8% | +5.8% to +28.9% | |
+| Monday | **forecast** | 281 | 58.8% | **+12.0%** | +1.7% to +21.8% | 7 of 7 |
+| Thursday | recorded | 245 | 57.4% | +13.2% | +2.2% to +23.7% | |
+| Thursday | **forecast** | 383 | 56.7% | **+10.8%** | +1.6% to +19.2% | 5 of 7 |
+| Saturday | recorded | 225 | 52.4% | +5.6% | −5.3% to +16.8% | |
+| Saturday | **forecast** | 274 | 57.9% | **+9.6%** | −0.5% to +19.8% | 5 of 7 |
+| Sunday | **forecast** | 173 | 60.1% | +13.5% | +0.4% to +26.6% | 5 of 7 |
+
+* **The edge survives realistic forecasts.** It's smaller on Monday and Thursday than with hindsight weather, but still positive.
+* **It's almost all unders.** Over bets lose or break even on every day.
+* **Early-week outdoor totals run high.** Betting every outdoor under at FanDuel's Monday price made +5.0% (1,039 bets) with no model and no weather filter. That fades to +1.0% on Thursday and −1.0% on Saturday.
+* **A simple rule does as well as the model.** Under only when the forecast is wind over 15 mph or rain: Monday +12.6% (240 bets), Thursday +10.3% (353), Saturday +16.8% (238). Under when the forecast is wind over 10 mph or rain: +9.8%, +6.2%, +6.6%. These thresholds were picked partly after seeing earlier results, so treat them as a hypothesis to paper-trade.
+
 ## Caveats
 
-1. **Recorded weather, not forecasts.** The backtest uses weather recorded at kickoff. A bettor only has the forecast, which can be wrong, especially for wind. This flatters the weather results; how much is unknown until the backtest runs on real historical forecasts.
+1. **Recorded vs forecast weather.** The 2010–2025 backtests use recorded weather. The 2020–2026 FanDuel tests were redone with real forecasts (above), and the edge held up.
 2. **Consensus prices before 2020.** The 2010–2019 backtests use consensus closing lines. FanDuel's real prices at four snapshots a week are tested from 2020 (see above).
 3. **Small real-price samples.** About 230 FanDuel over/under bets per snapshot and 178 alternate bets is too few to separate a 5% edge from luck.
 4. **Many variants tried.** The more versions and thresholds tested, the more likely one looks good by chance. Treat +4.8% as a lead, not a result.
@@ -124,5 +147,5 @@ There's no history of real alternate-line prices, so each alternate line from �
 
 1. Fill the last weather gaps (mainly 2026) by rerunning `build_data.py`.
 2. Backtest with historical weather **forecasts** instead of recorded weather.
-3. Re-run the Thursday/Saturday FanDuel backtests with historical forecasts. This is the key test of whether betting earlier in the week captures the weather edge.
+3. Done: the FanDuel backtests were rerun with historical NOAA forecasts (see above).
 4. Paper-trade the over/under model for the rest of 2026 before risking money.

@@ -107,7 +107,7 @@ def main():
     rec = feats.set_index("game_id")
     print("FORECAST ACCURACY vs recorded weather (outdoor games)")
     for snap in ("open", "mid", "late", "close"):
-        f = fc[fc.snapshot == snap].set_index("game_id").join(rec[["w_temp", "w_wind", "w_precip"]], rsuffix="_rec").dropna()
+        f = fc[fc.snapshot == snap].set_index("game_id").join(rec[["w_temp", "w_wind", "w_precip"]], rsuffix="_rec").dropna(subset=["w_temp", "w_wind", "w_precip", "w_temp_rec", "w_wind_rec", "w_precip_rec"])
         rain_f, rain_r = f.w_precip > 0.05, f.w_precip_rec > 0.05
         wind_f, wind_r = f.w_wind > 10, f.w_wind_rec > 10
         print(f"  {NAMES[snap]:8s} bet ({len(f)} games): temp off by {np.abs(f.w_temp - f.w_temp_rec).mean():.1f}F, "
