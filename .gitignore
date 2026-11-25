@@ -5,3 +5,5 @@ output/
 __pycache__/
 *.pyc
 data/raw_weather/
+data/odds_raw/
+data/alt_odds_raw/
